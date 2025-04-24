@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrowdSense - Real-Time Monitoring</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.5/heatmap.min.js"></script>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --primary-light: #3b82f6;
+            --primary-dark: #1e3a8a;
+            --secondary: #0369a1;
+            --accent: #f97316;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --bg-light: #f8fafc;
+            --bg-card: #ffffff;
+            --shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-light);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 1.25rem 2rem;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo i {
+            font-size: 1.8rem;
+            margin-right: 0.75rem;
+        }
+
+        .header-title h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .header-title p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .header-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            height: 100%;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title i {
+            font-size: 1rem;
+            color: var(--primary);
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .card-btn {
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            font-size: 0.9rem;
+            padding: 0.25rem;
+            transition: color 0.2s;
+        }
+
+        .card-btn:hover {
+            color: var(--primary);
+        }
+
+        .video-section {
+            grid-column: span 6;
+        }
+
+        .video-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            background: #000;
+            padding-top: 56.25%;
+            height: 0;
+        }
+
+        .video-container img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .overlay-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 0.75rem;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .record-icon {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .record-dot {
+            width: 10px;
+            height: 10px;
+            background: #f43f5e;
+            border-radius: 50%;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        .stats-section {
+            grid-column: span 3;
+        }
+
+        .stat-card {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background: rgba(59, 130, 246, 0.05);
+            border: 1px solid rgba(59, 130, 246, 0.1);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stat-label i {
+            color: var(--primary);
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+        }
+
+        .stat-trend {
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .trend-up {
+            color: #16a34a;
+        }
+
+        .trend-down {
+            color: #dc2626;
+        }
+
+        .download-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+            margin-top: 1rem;
+        }
+
+        .download-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .analytics-section {
+            grid-column: span 3;
+        }
+
+        .charts-section {
+            grid-column: span 6;
+        }
+
+        .heatmap-section {
+            grid-column: span 6;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            margin-bottom: 1.5rem;
+            height: 200px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 100%;
+        }
+
+        .heatmap-container {
+            width: 100%;
+            height: 300px;
+            background: #eee;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 0 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 10px;
+            margin-right: 0.5rem;
+            border-radius: 2px;
+        }
+
+        .time-selector {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .time-btn {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .time-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .time-btn:hover:not(.active) {
+            background: #f1f5f9;
+        }
+
+        @media (max-width: 1200px) {
+            .video-section, .charts-section, .heatmap-section {
+                grid-column: span 12;
+            }
+            
+            .stats-section, .analytics-section {
+                grid-column: span 6;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-section, .analytics-section {
+                grid-column: span 12;
+            }
+            
+            main {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-video"></i>
+                <div class="header-title">
+                    <h1>CrowdSense</h1>
+                    <p>Real-Time Crowd Monitoring & Analytics</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="header-btn">
+                    <i class="fas fa-cog"></i>
+                    Settings
+                </button>
+                <button class="header-btn">
+                    <i class="fas fa-bell"></i>
+                    Alerts
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="video-section">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-video"></i> Live Feed</h2>
+                    <div class="card-actions">
+                        <button class="card-btn" id="fullscreen-btn"><i class="fas fa-expand"></i></button>
+                        <button class="card-btn"><i class="fas fa-camera"></i></button>
+                    </div>
+                </div>
+                <div class="video-container">
+                    <img src="{{ url_for('video_feed') }}" alt="Live crowd monitoring feed" />
+                    <div class="overlay-info">
+                        <div class="record-icon">
+                            <div class="record-dot"></div>
+                            <span>LIVE</span>
+                        </div>
+                        <span id="feed-timestamp">12:45:32 PM</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="stats-section">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-chart-simple"></i> Real-Time Stats</h2>
+                    <div class="card-actions">
+                        <button class="card-btn" id="refresh-btn"><i class="fas fa-sync-alt"></i></button>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-users"></i> People Count</div>
+                    <div class="stat-value" id="count">--</div>
+                    <div class="stat-trend trend-up"><i class="fas fa-arrow-up"></i> <span id="count-trend">5%</span> from avg</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-compress-alt"></i> Pixel Density</div>
+                    <div class="stat-value" id="density">--</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-ruler-combined"></i> Real Density (per m²)</div>
+                    <div class="stat-value" id="real_density">--</div>
+                    <div class="stat-trend trend-up"><i class="fas fa-arrow-up"></i> <span id="density-trend">8%</span> from avg</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label"><i class="far fa-clock"></i> Last Update</div>
+                    <div class="stat-value" id="timestamp" style="font-size: 1.1rem;">--</div>
+                </div>
+                
+                <a href="/export_logs" class="download-btn">
+                    <i class="fas fa-download"></i>
+                    Download CSV Logs
+                </a>
+            </div>
+        </section>
+
+        <section class="analytics-section">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-chart-pie"></i> Analytics</h2>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-bullseye"></i> Peak Density</div>
+                    <div class="stat-value" id="peak-density">2.8 /m²</div>
+                    <div class="stat-trend trend-up"><i class="fas fa-arrow-up"></i> 12% from yesterday</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-clock"></i> Avg. Dwell Time</div>
+                    <div class="stat-value">4.2 min</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-route"></i> Main Traffic Path</div>
+                    <div class="stat-value" style="font-size: 1.1rem;">East → Center</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="charts-section">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-chart-line"></i> Trend Analysis</h2>
+                    <div class="time-selector">
+                        <button class="time-btn active" data-time="30m">30m</button>
+                        <button class="time-btn" data-time="1h">1h</button>
+                        <button class="time-btn" data-time="3h">3h</button>
+                        <button class="time-btn" data-time="24h">24h</button>
+                    </div>
+                </div>
+                
+                <div class="chart-wrapper">
+                    <div class="chart-container">
+                        <canvas id="countChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-wrapper">
+                    <div class="chart-container">
+                        <canvas id="densityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="heatmap-section">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title"><i class="fas fa-fire"></i> Crowd Density Heatmap</h2>
+                    <div class="card-actions">
+                        <button class="card-btn"><i class="fas fa-download"></i></button>
+                    </div>
+                </div>
+                
+                <div class="heatmap-container" id="heatmapContainer">
+                    <!-- Heatmap will be generated here -->
+                </div>
+                
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #0000ff;"></div>
+                        <span>Low</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #00ff00;"></div>
+                        <span>Medium</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ffff00;"></div>
+                        <span>High</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff0000;"></div>
+                        <span>Critical</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Update time in header
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('feed-timestamp').textContent = now.toLocaleTimeString();
+        }
+        setInterval(updateTime, 1000);
+
+        // Initialize charts with better styling
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index',
+            },
+            plugins: {
+                legend: {
+                    display: false,
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    titleColor: '#1e293b',
+                    bodyColor: '#1e293b',
+                    borderColor: 'rgba(0, 0, 0, 0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    boxPadding: 6,
+                    usePointStyle: true,
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.parsed.y;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        display: false,
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        maxRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 8,
+                        color: '#64748b'
+                    }
+                },
+                y: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)',
+                    },
+                    ticks: {
+                        color: '#64748b'
+                    },
+                    beginAtZero: true
+                }
+            },
+            elements: {
+                line: {
+                    tension: 0.4
+                },
+                point: {
+                    radius: 2,
+                    hoverRadius: 4
+                }
+            }
+        };
+
+        // People Count Chart
+        const countChartCtx = document.getElementById('countChart').getContext('2d');
+        const countChart = new Chart(countChartCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'People Count',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    pointBackgroundColor: '#3b82f6'
+                }]
+            },
+            options: chartOptions
+        });
+
+        // Density Chart
+        const densityChartCtx = document.getElementById('densityChart').getContext('2d');
+        const densityChart = new Chart(densityChartCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Real Density (per m²)',
+                    data: [],
+                    borderColor: '#f97316',
+                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    pointBackgroundColor: '#f97316'
+                }]
+            },
+            options: chartOptions
+        });
+
+        // Initialize heatmap
+        const heatmapContainer = document.getElementById('heatmapContainer');
+        const heatmapInstance = h337.create({
+            container: heatmapContainer,
+            radius: 20,
+            maxOpacity: 0.8,
+            minOpacity: 0.1,
+            blur: 0.8,
+            gradient: {
+                0.0: 'blue',
+                0.25: 'green',
+                0.5: 'yellow',
+                0.75: 'orange',
+                1.0: 'red'
+            }
+        });
+
+        // Generate demo data for the heatmap
+        function generateHeatmapData() {
+            const width = heatmapContainer.offsetWidth;
+            const height = heatmapContainer.offsetHeight;
+            const points = [];
+            const max = 100;
+            const len = 200;
+
+            for (let i = 0; i < len; i++) {
+                const val = Math.floor(Math.random() * max);
+                points.push({
+                    x: Math.floor(Math.random() * width),
+                    y: Math.floor(Math.random() * height),
+                    value: val
+                });
+            }
+
+            const heatmapData = {
+                max: max,
+                data: points
+            };
+            
+            heatmapInstance.setData(heatmapData);
+        }
+
+        // Update real-time stats from API
+        let avgCount = 0;
+        let countPoints = 0;
+        let avgDensity = 0;
+
+        function updateStats() {
+            fetch('/stats')
+                .then(res => res.json())
+                .then(data => {
+                    const now = new Date().toLocaleTimeString();
+
+                    // Update stat displays
+                    document.getElementById('count').textContent = data.count;
+                    document.getElementById('density').textContent = data.density.toFixed(6);
+                    document.getElementById('real_density').textContent = data.real_density.toFixed(2);
+                    document.getElementById('timestamp').textContent = data.timestamp;
+
+                    // Track averages for trend calculation
+                    countPoints++;
+                    const oldAvgCount = avgCount;
+                    const oldAvgDensity = avgDensity;
+                    avgCount = avgCount + (data.count - avgCount) / countPoints;
+                    avgDensity = avgDensity + (data.real_density - avgDensity) / countPoints;
+
+                    // Calculate trends
+                    if (countPoints > 1) {
+                        const countTrend = (data.count / avgCount - 1) * 100;
+                        const densityTrend = (data.real_density / avgDensity - 1) * 100;
+                        
+                        document.getElementById('count-trend').textContent = Math.abs(countTrend).toFixed(1) + '%';
+                        document.getElementById('count-trend').parentElement.className = 
+                            countTrend >= 0 ? 'stat-trend trend-up' : 'stat-trend trend-down';
+                        document.getElementById('count-trend').parentElement.innerHTML = 
+                            countTrend >= 0 ? 
+                            '<i class="fas fa-arrow-up"></i> ' + Math.abs(countTrend).toFixed(1) + '% from avg' : 
+                            '<i class="fas fa-arrow-down"></i> ' + Math.abs(countTrend).toFixed(1) + '% from avg';
+                            
+                        document.getElementById('density-trend').textContent = Math.abs(densityTrend).toFixed(1) + '%';
+                        document.getElementById('density-trend').parentElement.className = 
+                            densityTrend >= 0 ? 'stat-trend trend-up' : 'stat-trend trend-down';
+                        document.getElementById('density-trend').parentElement.innerHTML = 
+                            densityTrend >= 0 ? 
+                            '<i class="fas fa-arrow-up"></i> ' + Math.abs(densityTrend).toFixed(1) + '% from avg' : 
+                            '<i class="fas fa-arrow-down"></i> ' + Math.abs(densityTrend).toFixed(1) + '% from avg';
+                    }
+
+                    // Update charts
+                    if (countChart.data.labels.length > 30) {
+                        countChart.data.labels.shift();
+                        countChart.data.datasets[0].data.shift();
+                        densityChart.data.labels.shift();
+                        densityChart.data.datasets[0].data.shift();
+                    }
+
+                    countChart.data.labels.push(now);
+                    countChart.data.datasets[0].data.push(data.count);
+                    densityChart.data.labels.push(now);
+                    densityChart.data.datasets[0].data.push(data.real_density);
+
+                    countChart.update();
+                    densityChart.update();
+                    
+                    // Update heatmap occasionally
+                    if (Math.random() > 0.7) {
+                        generateHeatmapData();
+                    }
+                })
+                .catch(err => {
+                    console.error("Error fetching stats:", err);
+                });
+        }
+
+        // Initialize the page
+        window.addEventListener('load', function() {
+            generateHeatmapData();
+            updateStats();
+            setInterval(updateStats, 2000);
+            
+            // Add event listeners
+            document.getElementById('refresh-btn').addEventListener('click', updateStats);
+            document.getElementById('fullscreen-btn').addEventListener('click', function() {
+                const videoContainer = document.querySelector('.video-container');
+                if (videoContainer.requestFullscreen) {
+                    videoContainer.requestFullscreen();
+                } else if (videoContainer.mozRequestFullScreen) {
+                    videoContainer.mozRequestFullScreen();
+                } else if (videoContainer.webkitRequestFullscreen) {
+                    videoContainer.webkitRequestFullscreen();
+                } else if (videoContainer.msRequestFullscreen) {
+                    videoContainer.msRequestFullscreen();
+                }
+            });
+            
+            // Time selector buttons
+            document.querySelectorAll('.time-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    // Here you would fetch data for the selected time range
+                });
+            });
+        });
+    </script>
+</body>
+</html>

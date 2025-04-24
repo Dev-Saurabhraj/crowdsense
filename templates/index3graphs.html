@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CrowdSense - Real-Time Monitoring</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f0f4f8;
+            color: #333;
+        }
+        header {
+            background: #0f9d58;
+            color: white;
+            padding: 1rem 2rem;
+            text-align: center;
+        }
+        main {
+            padding: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            justify-content: center;
+        }
+        section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+        }
+        .video-section {
+            flex: 2 1 640px;
+        }
+        .stats-section {
+            flex: 1 1 300px;
+        }
+        .charts-section {
+            flex: 1 1 640px;
+        }
+        canvas {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>CrowdSense Dashboard</h1>
+        <p>Real-Time Crowd Monitoring & Density Analysis</p>
+    </header>
+
+    <main>
+        <section class="video-section">
+            <h2>Live Feed</h2>
+            <img src="{{ url_for('video_feed') }}" width="100%" style="border-radius: 10px;" />
+        </section>
+
+        <section class="stats-section">
+            <h2>Live Stats</h2>
+            <p><strong>People Count:</strong> <span id="count">--</span></p>
+            <p><strong>Pixel Density:</strong> <span id="density">--</span></p>
+            <p><strong>Real Density (per m²):</strong> <span id="real_density">--</span></p>
+            <p><strong>Last Update:</strong> <span id="timestamp">--</span></p>
+            <a href="/export_logs" style="margin-top: 10px; display:inline-block;">📥 Download CSV Logs</a>
+        </section>
+
+        <section class="charts-section">
+            <h2>Live Charts</h2>
+            <canvas id="countChart"></canvas>
+            <canvas id="densityChart"></canvas>
+        </section>
+    </main>
+
+    <script>
+        const countEl = document.getElementById('count');
+        const densityEl = document.getElementById('density');
+        const realDensityEl = document.getElementById('real_density');
+        const timestampEl = document.getElementById('timestamp');
+
+        const countChartCtx = document.getElementById('countChart').getContext('2d');
+        const densityChartCtx = document.getElementById('densityChart').getContext('2d');
+
+        const countData = {
+            labels: [],
+            datasets: [{
+                label: 'People Count',
+                borderColor: 'rgb(255, 99, 132)',
+                data: [],
+                fill: false,
+                tension: 0.3
+            }]
+        };
+
+        const densityData = {
+            labels: [],
+            datasets: [{
+                label: 'Real Density (/m²)',
+                borderColor: 'rgb(54, 162, 235)',
+                data: [],
+                fill: false,
+                tension: 0.3
+            }]
+        };
+
+        const countChart = new Chart(countChartCtx, {
+            type: 'line',
+            data: countData,
+            options: { responsive: true, scales: { x: { display: false } } }
+        });
+
+        const densityChart = new Chart(densityChartCtx, {
+            type: 'line',
+            data: densityData,
+            options: { responsive: true, scales: { x: { display: false } } }
+        });
+
+        function updateStats() {
+            fetch('/stats')
+                .then(res => res.json())
+                .then(data => {
+                    const now = new Date().toLocaleTimeString();
+
+                    countEl.textContent = data.count;
+                    densityEl.textContent = data.density.toFixed(6);
+                    realDensityEl.textContent = data.real_density.toFixed(2);
+                    timestampEl.textContent = data.timestamp;
+
+                    if (countData.labels.length > 30) {
+                        countData.labels.shift();
+                        countData.datasets[0].data.shift();
+                        densityData.labels.shift();
+                        densityData.datasets[0].data.shift();
+                    }
+
+                    countData.labels.push(now);
+                    countData.datasets[0].data.push(data.count);
+                    densityData.labels.push(now);
+                    densityData.datasets[0].data.push(data.real_density);
+
+                    countChart.update();
+                    densityChart.update();
+                });
+        }
+
+        setInterval(updateStats, 2000); // update every 2 seconds
+    </script>
+</body>
+</html>
