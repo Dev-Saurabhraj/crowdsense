@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CrowdSense Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #111;
+      color: #eee;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+    }
+    h1 {
+      color: #0f0;
+      margin-bottom: 0.5rem;
+    }
+    .video-stream {
+      border: 2px solid #0f0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .stats-panel {
+      width: 100%;
+      max-width: 1000px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat {
+      background: #1a1a1a;
+      padding: 1rem;
+      border-radius: 8px;
+      flex: 1 1 280px;
+      box-shadow: 0 0 8px rgba(0,255,0,0.2);
+    }
+    canvas {
+      background: #222;
+      border-radius: 8px;
+      padding: 0.5rem;
+    }
+    .heatmap-legend {
+      margin-top: 1rem;
+      width: 300px;
+      height: 20px;
+      background: linear-gradient(to right, blue, green, yellow, red);
+      border-radius: 10px;
+      border: 1px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔥 CrowdSense Dashboard</h1>
+    <div class="video-stream">
+      <img src="{{ url_for('video_feed') }}" width="720" />
+    </div>
+
+    <div class="stats-panel">
+      <div id="alertZone" class="stat" style="border-left: 5px solid #00ff88; background-color: #222;">
+        🟢 Safe Zone: All good.
+      </div>
+      <div id="peopleCount" class="stat">👥 People Count: Loading...</div>
+      <div id="density" class="stat">📊 Pixel Density: Loading...</div>
+      <div id="realDensity" class="stat">🌐 Real Density: Loading...</div>
+    </div>
+
+    <canvas id="countChart" width="600" height="200"></canvas>
+    <canvas id="densityChart" width="600" height="200"></canvas>
+
+    <div class="heatmap-legend"></div>
+    <p>Heatmap Intensity Legend: Blue (low) → Green → Yellow → Red (high)</p>
+  </div>
+
+  <script>
+    const countChart = new Chart(document.getElementById('countChart'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'People Count',
+          data: [],
+          borderColor: '#00ff88',
+          backgroundColor: 'rgba(0,255,136,0.2)',
+          tension: 0.2
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { labels: { color: '#eee' } } }, scales: {
+        x: { ticks: { color: '#ccc' } },
+        y: { ticks: { color: '#ccc' } }
+      } }
+    });
+
+    const densityChart = new Chart(document.getElementById('densityChart'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Real Density (people/m²)',
+          data: [],
+          borderColor: '#ff4444',
+          backgroundColor: 'rgba(255, 68, 68, 0.2)',
+          tension: 0.2
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { labels: { color: '#eee' } } }, scales: {
+        x: { ticks: { color: '#ccc' } },
+        y: { ticks: { color: '#ccc' } }
+      } }
+    });
+
+    async function updateStats() {
+      const res = await fetch("/stats");
+      const data = await res.json();
+      const realDensity = data.real_density;
+
+      document.getElementById("peopleCount").innerText = `👥 People Count: ${data.count}`;
+      document.getElementById("density").innerText = `📊 Pixel Density: ${data.density.toFixed(6)}`;
+      document.getElementById("realDensity").innerText = `🌐 Real Density: ${realDensity.toFixed(2)} people/m²`;
+
+      // ⚠️ Alert Zone
+      const alertDiv = document.getElementById("alertZone");
+      if (realDensity > 5.0) {
+        alertDiv.innerText = "🚨 DANGER ZONE: Too much crowd!";
+        alertDiv.style.borderLeftColor = "red";
+        alertDiv.style.backgroundColor = "#400000";
+      } else if (realDensity > 2.5) {
+        alertDiv.innerText = "🟠 Warning Zone: Monitor closely.";
+        alertDiv.style.borderLeftColor = "orange";
+        alertDiv.style.backgroundColor = "#333000";
+      } else {
+        alertDiv.innerText = "🟢 Safe Zone: All good.";
+        alertDiv.style.borderLeftColor = "#00ff88";
+        alertDiv.style.backgroundColor = "#222";
+      }
+
+      const ts = data.timestamp.slice(11);
+      countChart.data.labels.push(ts);
+      countChart.data.datasets[0].data.push(data.count);
+      densityChart.data.labels.push(ts);
+      densityChart.data.datasets[0].data.push(realDensity);
+      countChart.update();
+      densityChart.update();
+
+      if (countChart.data.labels.length > 20) {
+        countChart.data.labels.shift();
+        countChart.data.datasets[0].data.shift();
+        densityChart.data.labels.shift();
+        densityChart.data.datasets[0].data.shift();
+      }
+    }
+
+    setInterval(updateStats, 1000);
+  </script>
+</body>
+</html>
