@@ -6,13 +6,19 @@ import numpy as np
 import csv
 import os
 from datetime import datetime
+import time
 
 app = Flask(__name__)
 
 # Load YOLOv8 model
 model = YOLO("yolov8n.pt")
-cap = cv2.VideoCapture(0, cv2.CAP_MSMF)
 
+# Use test video (30 fps)
+cap = cv2.VideoCapture(1)
+fps = 30
+frame_interval = 1.0 / fps
+
+# Shared state
 dot_data = []
 heatmap_grid = []
 density = 0
@@ -20,29 +26,37 @@ real_density = 0
 people_count = 0
 lock = threading.Lock()
 
-# Homography for real-world mapping
+# Homography (image -> real world)
 image_pts = np.array([[100, 100], [540, 100], [540, 380], [100, 380]], dtype='float32')
 real_pts = np.array([[0, 0], [10, 0], [10, 5], [0, 5]], dtype='float32')  # 50 m²
 H, _ = cv2.findHomography(image_pts, real_pts)
 real_area_m2 = 50
 
-# Logging CSV
+# CSV log setup
 LOG_FILE = 'logs.csv'
 if not os.path.exists(LOG_FILE):
-    with open(LOG_FILE, mode='w', newline='') as file:
-        writer = csv.writer(file)
+    with open(LOG_FILE, 'w', newline='') as f:
+        writer = csv.writer(f)
         writer.writerow(['Timestamp', 'PeopleCount', 'PixelDensity', 'RealDensity'])
 
 def log_data(timestamp, people_count, density, real_density):
-    with open(LOG_FILE, mode='a', newline='') as file:
-        writer = csv.writer(file)
+    with open(LOG_FILE, 'a', newline='') as f:
+        writer = csv.writer(f)
         writer.writerow([timestamp, people_count, density, real_density])
 
 def generate_frames():
     global dot_data, heatmap_grid, density, real_density, people_count
+    last_time = time.time()
+
     while True:
+        current_time = time.time()
+        if current_time - last_time < frame_interval:
+            continue
+        last_time = current_time
+
         success, frame = cap.read()
         if not success:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Loop video
             continue
 
         results = model(frame)
@@ -59,17 +73,8 @@ def generate_frames():
                     cx = int((x1 + x2) / 2)
                     cy = int((y1 + y2) / 2)
                     dots.append({"x": cx, "y": cy})
-
-                    # Red dot in image
                     cv2.circle(frame, (cx, cy), 6, (0, 0, 255), -1)
 
-                    # Homography projection (optional real-world dots)
-                    img_pt = np.array([[cx, cy]], dtype='float32')
-                    img_pt = np.array([img_pt])
-                    real_pt = cv2.perspectiveTransform(img_pt, H)[0][0]
-                    # Could log real_pt here
-
-                    # Heatmap grid update
                     gx = min(grid_cols - 1, cx * grid_cols // frame.shape[1])
                     gy = min(grid_rows - 1, cy * grid_rows // frame.shape[0])
                     grid[gy][gx] += 1
@@ -86,17 +91,17 @@ def generate_frames():
             people_count = len(dots)
             log_data(timestamp, people_count, density, real_density)
 
-        # Grid Overlay
         height, width = frame.shape[:2]
         for i in range(1, grid_rows):
             y = int(i * height / grid_rows)
-            cv2.line(frame, (0, y), (width, y), (50, 255, 50), 1)
+            cv2.line(frame, (0, y), (width, y), (0, 255, 0), 1)
         for j in range(1, grid_cols):
             x = int(j * width / grid_cols)
-            cv2.line(frame, (x, 0), (x, height), (50, 255, 50), 1)
+            cv2.line(frame, (x, 0), (x, height), (0, 255, 0), 1)
 
         ret, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
+
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
